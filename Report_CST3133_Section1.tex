@@ -13,6 +13,7 @@
 \usepackage{array}
 \usepackage{tabularx}
 \usepackage{graphicx}
+\usepackage{grffile}
 \usepackage{float}
 \usepackage{amsmath}
 \usepackage{hyperref}
@@ -21,6 +22,8 @@
 \usepackage{enumitem}
 \usepackage{xcolor}
 \usepackage{microtype}
+\usepackage{ragged2e}
+\justifying
 
 % ─── Page style ──────────────────────────────────────────────────────────────
 \pagestyle{fancy}
@@ -53,8 +56,13 @@
 %  COVER PAGE
 % ═══════════════════════════════════════════════════════════════════════════
 \begin{titlepage}
+    \noindent
+    \begin{flushright}
+    \includegraphics[height=3cm]{"Graphs/middlesexuniversity.png"}
+    \end{flushright}
+    \vspace{0.5cm}
     \centering
-    \vspace*{1cm}
+    \vspace*{0.5cm}
 
     {\Large \textbf{MIDDLESEX UNIVERSITY}}\\[0.3cm]
     {\normalsize The Burroughs, Hendon, London NW4 4BT}\\[2cm]
@@ -62,16 +70,19 @@
     \rule{\linewidth}{0.5pt}\\[0.5cm]
     {\LARGE \textbf{CST3133 Coursework}}\\[0.3cm]
     {\Large Applied Data Science and AI Workflow}\\[0.3cm]
-    {\large Section 1 -- Traditional Machine Learning Workflow and Ethics}\\[0.3cm]
+    {\large Unified Report -- Dataset 1 (Structured) \& Dataset 2 (Text)}\\[0.3cm]
     \rule{\linewidth}{0.5pt}\\[2cm]
 
     {\large
     \begin{tabular}{ll}
-        \textbf{Student Name / Surname} & [Your Name Here] \\[0.3cm]
-        \textbf{Student ID}             & [Your ID Here]   \\[0.3cm]
+        \textbf{Group Members}          & \\[0.2cm]
+        Dumitru Nirca                   & M00888146 \\[0.2cm]
+        Sebastian Robert Danci          & M00886707 \\[0.2cm]
+        Maciej Kacper Ciba              & M00864763 \\[0.2cm]
+        Peter Nagy                      & M00871555 \\[0.5cm]
         \textbf{Module}                 & CST3133 -- Advanced Topics in Data Science and AI \\[0.3cm]
         \textbf{Module Leader}          & Dr.\ Halil Yetgin \\[0.3cm]
-        \textbf{Word Count}             & [Add word count here, max 7000] \\
+        \textbf{Word Count}             & four thousand five hundred (Section~1) + Section~2 (max seven thousand total) \\
     \end{tabular}
     }
 
@@ -84,56 +95,95 @@
 % ═══════════════════════════════════════════════════════════════════════════
 \newpage
 \tableofcontents
+\listoffigures
+\listoftables
 \newpage
 
 % ═══════════════════════════════════════════════════════════════════════════
-%  SECTION 1
+%  SECTION 1 -- DATASET 1 (STRUCTURED DATA)
 % ═══════════════════════════════════════════════════════════════════════════
-\section{Section 1 -- Traditional Machine Learning Workflow and Ethics}
+\section{Section 1 -- Traditional Machine Learning Workflow and Ethics (Dataset 1)}
+
+\noindent\textit{This section covers Dataset 1: the CSGO match prediction structured dataset.}
+
+\paragraph{Introduction and Objectives.}
+This project applies a complete traditional machine learning workflow to predict CSGO match outcomes from pre-match statistics. Esports analytics increasingly informs team strategy, talent scouting, and performance benchmarking; accurate pre-match predictions can support these applications. The report documents: (one) dataset selection and problem formulation; (two) preprocessing and handling of data quality issues; (three) exploratory analysis and bias identification; (four) model development, evaluation, and interpretation; and (five) ethical considerations and mitigation strategies. We aim to achieve predictive accuracy above random chance (50\%) while maintaining interpretability and documenting limitations.
 
 % ───────────────────────────────────────────────────────────────────────────
 \subsection{1.1\quad Dataset Selection and Problem Definition (5\%)}
 
 \subsubsection{1.1.1\quad Dataset Overview}
 
-The dataset selected for this coursework is the \textbf{CSGO (Counter-Strike: Global Offensive) Match Prediction} dataset, which contains historical competitive match data from professional CSGO esports competitions. The dataset provides comprehensive team-level and player-level statistics recorded prior to each match and is publicly available for research purposes.
+The \textbf{CSGO Match Prediction} dataset contains historical professional match data with comprehensive team- and player-level pre-match statistics. It is publicly available on Kaggle: \url{https://www.kaggle.com/datasets/gabrieltardochi/counter-strike-global-offensive-matches}. The dataset file \texttt{csgo\_games.csv} is submitted alongside this report. In raw form the dataset has three thousand seven hundred and eighty-seven rows and one hundred and seventy features; after preprocessing and feature engineering it retains three thousand seven hundred and sixty-three valid records and one hundred and seventy-two features for modelling.
 
-The dataset in its raw form contains \textbf{3,787 rows} and \textbf{170 features}, expanding to \textbf{178 features} following feature engineering (Section~1.2). The processed dataset, after noise introduction and cleaning, retains \textbf{3,763 valid match records}.
+Features are organised into two broad categories. Table~\ref{tab:features_overview} provides a detailed breakdown.
 
-Features are organised into two broad categories:
+\begin{table}[H]
+\centering
+\caption{Exact feature inventory and descriptions.}
+\label{tab:features_overview}
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+\textbf{Category} & \textbf{Features (exact names and meanings)} \\
+\midrule
+Team-level (raw) & \texttt{t1\_world\_rank}, \texttt{t2\_world\_rank} (world rankings 1--$\infty$); \texttt{t1\_h2h\_win\_perc}, \texttt{t2\_h2h\_win\_perc} (head-to-head win \%); \texttt{t1\_points}, \texttt{t2\_points} (removed---data leakage). \\
+\midrule
+Player-level (per player) & For each of \texttt{t1\_player1}--\texttt{t1\_player5} and \texttt{t2\_player1}--\texttt{t2\_player5}: \texttt{rating} (HLTV), \texttt{impact}, \texttt{kdr}, \texttt{dmr}, \texttt{kpr}, \texttt{apr}, \texttt{dpr}, \texttt{spr}, \texttt{opk\_ratio}, \texttt{opk\_rating}, \texttt{wins\_perc\_after\_fk}, \texttt{fk\_perc\_in\_wins}, \texttt{multikill\_perc}, \texttt{rating\_at\_least\_one\_perc}, \texttt{is\_sniper}, \texttt{clutch\_win\_perc}. \\
+\midrule
+Engineered & \texttt{t1\_avg\_rating}, \texttt{t2\_avg\_rating}; \texttt{t1\_avg\_impact}, \texttt{t2\_avg\_impact}; \texttt{t1\_avg\_kdr}, \texttt{t2\_avg\_kdr}; \texttt{rank\_diff}; \texttt{h2h\_advantage}. \\
+\bottomrule
+\end{tabularx}
+\end{table}
 
-\begin{itemize}[leftmargin=1.5em]
-    \item \textbf{Team-level features:} World rankings (\texttt{t1\_world\_rank}, \texttt{t2\_world\_rank}), head-to-head win percentages (\texttt{t1\_h2h\_win\_perc}, \texttt{t2\_h2h\_win\_perc}), and tournament points.
-    \item \textbf{Player-level features:} Per-player statistics for all 10 players (5 per team), including HLTV rating, Kill-Death Ratio (KDR), impact score, damage per round, assists, first-kill percentages, clutch win percentages, multi-kill percentages, and opening kill ratings.
-\end{itemize}
-
-\textbf{Target variable:} \texttt{winner} -- a binary categorical variable encoding which team won the match (\texttt{t1} = Team~1, \texttt{t2} = Team~2). The class distribution is near-perfectly balanced: 51.05\% Team~1 wins (1,921 matches) and 48.95\% Team~2 wins (1,842 matches), confirming that no oversampling or class weighting is required.
-
-The dataset is uploaded alongside this submission as \texttt{csgo\_games.csv}.
+\textbf{Target variable:} \texttt{winner}---binary (Team~1 or Team~2). Class distribution is near-balanced (51.05\% / 48.95\%), so no oversampling or class weighting is required.
 
 \subsubsection{1.1.2\quad Problem Definition}
 
-This project addresses a \textbf{binary classification problem}: predicting which team will win a CSGO match given only pre-match available statistics. The prediction task has direct practical relevance in esports analytics, including team scouting, strategic preparation, and performance benchmarking.
+This project addresses a \textbf{binary classification problem}: predicting which team will win a CSGO match given only pre-match available statistics.
+
+\textbf{Specific use cases:} (one) Team management and scouting---front offices can use predictions to prioritise opponent analysis and benchmark expected win probability against actual results; (two) tournament organisers can inform seeding decisions and scheduling; (three) content and broadcast partners can generate pre-match storylines and tailor commentary; (four) sponsorship and investment teams can assess team strength quantitatively. The problem has a \textbf{gambling-like nature}: like football matches or roulette, outcomes are inherently stochastic and not fully predictable from available inputs. The model provides probability estimates, not deterministic forecasts; interpretability and documented limitations are essential for responsible deployment.
 
 % ───────────────────────────────────────────────────────────────────────────
 \subsection{1.2\quad Data Preprocessing (10\%)}
 
 \subsubsection{1.2.1\quad Handling Missing Values and Noise}
 
-The original dataset was largely pre-cleaned. In accordance with coursework requirements, noise was deliberately introduced to simulate real-world data quality issues. Specifically, \textbf{5\% of values in the first 10 numerical columns} were randomly set to \texttt{NaN} (Not a Number) using a seeded random process (\texttt{np.random.seed(42)}) to ensure full reproducibility. This is representative of real-world scenarios such as logging failures, incomplete telemetry, or data pipeline errors common in esports analytics systems.
+The dataset contained naturally occurring missing values (six thousand seven hundred and forty-three NaNs across thirty-four player-level columns); additional NaN values were introduced in selected columns per coursework requirements to create a noisy version for preprocessing. The focus is on identifying and mitigating these data quality issues. \textbf{Imputation strategy:} Median imputation for numerical columns, as the median is robust to outliers in player statistics where exceptional performances can skew means; mode imputation for categorical columns. Figure~\ref{fig:missing} shows missing values by column before imputation.
 
-Following noise introduction, the following imputation strategy was applied:
+Table~\ref{tab:before_after} summarises before and after preprocessing.
 
-\begin{itemize}[leftmargin=1.5em]
-    \item \textbf{Numerical columns:} Median imputation via scikit-learn's \texttt{SimpleImputer}. The median was preferred over the mean because it is robust to outliers — in player statistics, exceptional match performances can strongly skew arithmetic means.
-    \item \textbf{Categorical columns:} Mode imputation, replacing missing values with the most frequently occurring category.
-\end{itemize}
+\begin{table}[H]
+\centering
+\caption{Data quality: before and after preprocessing.}
+\label{tab:before_after}
+\begin{tabularx}{\textwidth}{l>{\raggedright\arraybackslash}X>{\centering\arraybackslash}X}
+\toprule
+\textbf{Aspect} & \textbf{Before (with NaN / noise)} & \textbf{After (processed)} \\
+\midrule
+Rows & 3,787 & 3,763 \\
+Columns / features & 170 & 172 (numerical only) \\
+Missing values & 6,743+ (natural + introduced; imputed) & 0 \\
+Outliers & Present (median imputation) & Retained, scaled \\
+Leakage features & \texttt{t1\_points}, \texttt{t2\_points}, \texttt{points\_diff} & Removed \\
+Train / test split & -- & 3,010 / 753 \\
+\bottomrule
+\end{tabularx}
+\end{table}
 
-After imputation, the dataset contained \textbf{0 missing values}, confirming successful data cleaning. The noisy dataset is uploaded alongside this submission.
+Outliers were identified via boxplot inspection of key features (e.g., \texttt{rank\_diff}, ratings), right-skewed distributions in world rankings, and domain knowledge---exceptional player performances (e.g., KDR above two) are valid but rare. Median imputation was chosen for robustness to extremes. Range validation confirmed no impossible values (e.g., negative percentages). After imputation, the dataset contains zero missing values.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{"Graphs/missing_values_by_column.png"}
+\caption{Missing values by column before imputation; guided imputation strategy.}
+\label{fig:missing}
+\end{figure}
+
+The \texttt{csgo\_games.csv} file and preprocessing documentation are submitted alongside this report.
 
 \subsubsection{1.2.2\quad Feature Engineering and Scaling}
 
-To improve model performance and provide more informative input signals, \textbf{eight new aggregated features} were engineered:
+\textbf{Eight engineered features:}
 
 \begin{table}[H]
 \centering
@@ -142,7 +192,7 @@ To improve model performance and provide more informative input signals, \textbf
 \toprule
 \textbf{Feature} & \textbf{Description and Rationale} \\
 \midrule
-\texttt{t1\_avg\_rating}, \texttt{t2\_avg\_rating} & Average HLTV rating across each team's 5 players. Player rating is the primary individual performance metric in professional CSGO. \\
+\texttt{t1\_avg\_rating}, \texttt{t2\_avg\_rating} & Average HLTV rating across each team's five players. Player rating is the primary individual performance metric in professional CSGO. \\
 \texttt{t1\_avg\_impact}, \texttt{t2\_avg\_impact} & Average impact score per team, measuring round-winning contributions beyond kills. \\
 \texttt{t1\_avg\_kdr}, \texttt{t2\_avg\_kdr} & Average Kill-Death Ratio per team, a standard measure of individual survivability and lethality. \\
 \texttt{rank\_diff} & Difference in world rankings (\texttt{t1\_world\_rank} $-$ \texttt{t2\_world\_rank}). Captures the relative competitive strength gap. \\
@@ -151,42 +201,65 @@ To improve model performance and provide more informative input signals, \textbf
 \end{tabularx}
 \end{table}
 
-Three features (\texttt{t1\_points}, \texttt{t2\_points}, \texttt{points\_diff}) were removed to prevent \textbf{data leakage}, as tournament points are updated following match results and would not be legitimately available prior to a match.
-
-All 172 retained numerical features were standardised using \textbf{StandardScaler}, transforming each to zero mean and unit variance. Standardisation is essential for Logistic Regression, which is sensitive to feature scale. The target variable was encoded using \textbf{LabelEncoder} (\texttt{t1} $\rightarrow$ 0, \texttt{t2} $\rightarrow$ 1).
-
-The final processed feature matrix shape was $(3{,}763 \times 172)$, split into \textbf{3,010 training samples} and \textbf{753 test samples} using a stratified 80/20 split (\texttt{random\_state=2024}).
+Three features (\texttt{t1\_points}, \texttt{t2\_points}, \texttt{points\_diff}) were removed to prevent \textbf{data leakage}, as tournament points are updated following match results and would not be available prior to a match. All one hundred and seventy-two retained numerical features were standardised using \textbf{StandardScaler}; the target was encoded with \textbf{LabelEncoder}. The final split is three thousand and ten training samples and seven hundred and fifty-three test samples (stratified eighty/twenty).
 
 % ───────────────────────────────────────────────────────────────────────────
 \subsection{1.3\quad Exploratory Data Analysis (10\%)}
 
 \subsubsection{1.3.1\quad Class Distribution}
 
-As shown in the dataset overview, the target variable is near-perfectly balanced (51.05\% / 48.95\%). This ensures that standard accuracy is a valid primary evaluation metric, and that classification models are not inadvertently rewarded for predicting the majority class.
+As shown in the dataset overview, the target variable is near-perfectly balanced (51.05\% / 48.95\%). This ensures that standard accuracy is a valid primary evaluation metric and that models are not inadvertently rewarded for predicting the majority class.
 
 \subsubsection{1.3.2\quad Feature Distributions}
 
-Histograms of key features (world rankings, average ratings, rank difference, and H2H advantage) reveal that:
+Figure~\ref{fig:class_dist} shows the class distribution. Histograms of key features (Figures~\ref{fig:dist_key_features}) reveal: world rankings exhibit a right-skewed distribution reflecting concentration among top-ranked teams; average ratings cluster near one (the HLTV baseline); \texttt{rank\_diff} spans a wide range, indicating diverse competitive matchups.
 
-\begin{itemize}[leftmargin=1.5em]
-    \item World rankings exhibit a \textbf{right-skewed distribution}, reflecting the concentration of professional match records among top-ranked teams.
-    \item Average ratings are \textbf{approximately normally distributed} around 1.0 (the HLTV baseline for professional play), consistent with expectations for elite competition.
-    \item \texttt{rank\_diff} spans a wide range, indicating considerable variety in the competitive gap between matched teams.
-\end{itemize}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.75\textwidth]{"Graphs/Distribution of Match Winners.png"}
+\caption{Match outcome distribution (t1 vs.\ t2); nearly balanced.}
+\label{fig:class_dist}
+\end{figure}
 
-\subsubsection{1.3.3\quad Key Trends and Patterns}
 
-A correlation analysis and visualisation of \texttt{rank\_diff} against match outcomes confirms a clear trend: when Team~1 holds a significantly better world ranking (more negative \texttt{rank\_diff}), Team~1 wins more frequently. This validates world ranking as a meaningful and dominant predictive signal.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{"Graphs/Distribution_of_key_features.png"}
+\caption{Key feature histograms: rankings, ratings, \texttt{rank\_diff}, \texttt{h2h\_advantage}.}
+\label{fig:dist_key_features}
+\end{figure}
 
-Correlation analysis between key features and match outcome reveals:
+\subsubsection{1.3.3\quad Feature Dependencies}
 
-\begin{itemize}[leftmargin=1.5em]
-    \item \textbf{Strong correlation:} \texttt{t1\_avg\_rating} with Team~1 victories; \texttt{t2\_avg\_rating} with Team~2 victories — confirming that average team quality is the primary driver of match outcomes.
-    \item \textbf{Moderate correlation:} Player-level statistics including clutch win percentages, multi-kill percentages, and opening kill ratings — highlighting the value of high-impact individual moments.
-    \item \textbf{Dominant feature:} \texttt{rank\_diff} emerged as the highest-importance feature in the Decision Tree model (importance: 0.0704), reinforcing this analytical finding.
-\end{itemize}
+Correlation analysis (Figure~\ref{fig:correlation}) reveals important feature dependencies: \texttt{t1\_avg\_rating} and \texttt{t2\_avg\_rating} correlate strongly with individual player ratings (expected, since they are team averages); \texttt{rank\_diff} correlates with team-average ratings. This multicollinearity motivates feature selection to reduce redundant predictors.
 
-\subsubsection{1.3.4\quad Potential Biases Identified in the Data}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{"Graphs/Corellation Features.png"}
+\caption{Correlation heatmap; informed feature selection.}
+\label{fig:correlation}
+\end{figure}
+
+\subsubsection{1.3.4\quad Key Trends}
+
+When Team~1 holds a better world ranking (more negative \texttt{rank\_diff}), Team~1 wins more frequently---validating world ranking as a dominant predictive signal. \texttt{rank\_diff} and team-average ratings dominate; player-level statistics (clutch percentage, multi-kill percentage) contribute. Figures~\ref{fig:rank_diff_winner} and \ref{fig:team_ratings} visualise rank difference and team ratings by match outcome.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{"Graphs/Rank_difference_by_winner_and_rank_distribtuion_by_winner.png"}
+\caption{\texttt{rank\_diff} by winner; supports it as strong predictor.}
+\label{fig:rank_diff_winner}
+\end{figure}
+
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{"Graphs/team 1 Rating_ Team 2 Rating.png"}
+\caption{Team ratings by outcome; higher ratings correlate with wins.}
+\label{fig:team_ratings}
+\end{figure}
+
+\subsubsection{1.3.5\quad Potential Biases Identified in the Data}
 
 \begin{enumerate}[leftmargin=1.5em]
     \item \textbf{Temporal Bias:} The dataset spans multiple competitive seasons. CSGO meta-game shifts (strategy, weapon balance, map pool) mean that patterns from earlier years may not generalise to more recent matches.
@@ -201,25 +274,18 @@ Correlation analysis between key features and match outcome reveals:
 
 Three model categories were developed:
 
-\paragraph{Logistic Regression (Supervised Classification).}
-A linear baseline classifier trained using \texttt{LogisticRegression} with \texttt{max\_iter=1000} and regularisation parameter $C=1$. Logistic Regression models the log-odds of the binary outcome as a linear combination of features:
-\[
-\log\frac{P(y=1|\mathbf{x})}{1-P(y=1|\mathbf{x})} = \mathbf{w}^\top \mathbf{x} + b
-\]
-It is interpretable, computationally efficient, and provides calibrated probability estimates — making it the natural baseline for this problem.
+\paragraph{Logistic Regression.} A linear baseline classifier modelling the log-odds as $\log\frac{P(y=1|\mathbf{x})}{1-P(y=1|\mathbf{x})} = \mathbf{w}^\top \mathbf{x} + b$. It is interpretable, computationally efficient, and provides calibrated probability estimates---the natural baseline for this problem.
 
-\paragraph{Decision Tree (Supervised Classification).}
-A non-linear classifier trained with \texttt{max\_depth=10} and \texttt{min\_samples\_split=20}. Depth limiting prevents overfitting, and the split threshold avoids excessively specific leaf nodes. Decision Trees also produce direct feature importance scores, valuable for interpretability.
+\paragraph{Decision Tree.} A non-linear classifier using Gini impurity $G(t) = 1 - \sum_c p(c|t)^2$ to recursively partition the feature space. Trained with \texttt{max\_depth}=10 and \texttt{min\_samples\_split}=20 to limit overfitting. Produces direct feature importance scores based on impurity reduction.
 
-\paragraph{K-Means Clustering (Unsupervised).}
-K-Means with $k=2$ clusters was applied to the full scaled feature space to investigate whether natural data groupings align with match outcomes. Being unsupervised, it is evaluated using the Adjusted Rand Index (ARI) and Silhouette Score rather than accuracy.
+\paragraph{K-Means.} Per the coursework requirement for an unsupervised method, K-Means with $k=2$ was applied to test whether match outcomes can be recovered from natural groupings in the feature space. The objective minimises $\sum_i \sum_{\mathbf{x} \in C_i} \|\mathbf{x} - \boldsymbol{\mu}_i\|^2$. The result (ARI $\approx 0$) demonstrates that unsupervised clustering cannot separate winners, justifying supervised classification.
 
 \subsubsection{1.4.2\quad Evaluation Metrics}
 
 For classification models:
 
 \begin{itemize}[leftmargin=1.5em]
-    \item \textbf{Accuracy:} $\frac{TP + TN}{TP + TN + FP + FN}$ — proportion of correctly classified matches.
+    \item \textbf{Accuracy:} $\frac{TP + TN}{TP + TN + FP + FN}$ --- proportion of correctly classified matches.
     \item \textbf{Precision:} $\frac{TP}{TP + FP}$ — of all predicted Team~1 wins, how many were correct.
     \item \textbf{Recall:} $\frac{TP}{TP + FN}$ — of all actual Team~1 wins, how many were identified.
     \item \textbf{F1-Score:} $\frac{2 \cdot \text{Precision} \cdot \text{Recall}}{\text{Precision} + \text{Recall}}$ — harmonic mean balancing precision and recall.
@@ -227,8 +293,8 @@ For classification models:
 
 For K-Means:
 \begin{itemize}[leftmargin=1.5em]
-    \item \textbf{Adjusted Rand Index (ARI):} Agreement between cluster assignments and true labels, corrected for chance. ARI $\approx 0$ indicates random assignment.
-    \item \textbf{Silhouette Score:} Measures cluster cohesion and separation; values near 1 indicate well-separated clusters.
+    \item \textbf{Adjusted Rand Index (ARI):} $\text{ARI} = \frac{\text{RI} - \mathbb{E}[\text{RI}]}{\max(\text{RI}) - \mathbb{E}[\text{RI}]}$, where RI is the Rand Index. Agreement between cluster assignments and true labels, corrected for chance. ARI $\approx 0$ indicates random assignment.
+    \item \textbf{Silhouette Score:} $s(i) = \frac{b(i) - a(i)}{\max(a(i), b(i))}$, where $a(i)$ is mean intra-cluster distance and $b(i)$ is mean nearest-cluster distance. Values near 1 indicate well-separated clusters.
 \end{itemize}
 
 \subsubsection{1.4.3\quad Results}
@@ -243,29 +309,122 @@ Table~\ref{tab:results} presents the performance of all trained models on the he
 \toprule
 \textbf{Model} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1-Score} \\
 \midrule
-Logistic Regression     & 58.17\%  & 0.5833 & 0.5526 & 0.5676 \\
-Decision Tree           & 50.98\%  & 0.5068 & 0.4868 & 0.4966 \\
-K-Means (ARI / Sil.)    & $-$0.0008 & -- & -- & -- / 0.0710 \\
-Tuned XGBoost (best)    & 59.10\%  & 0.5894 & 0.5447 & 0.5662 \\
+Logistic Regression           & 55.91\%  & 0.5476 & 0.5772 & 0.5620 \\
+Decision Tree                 & 53.78\%  & 0.5258 & 0.5799 & 0.5515 \\
+K-Means (ARI / Sil.)          & $-$0.0003 & -- & -- & -- / 0.0645 \\
+LR with Feature Selection (best) & 58.70\%  & 0.5751 & 0.6016 & 0.5881 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Logistic Regression provides the strongest baseline at 58.17\%, outperforming the Decision Tree by over 7 percentage points. The near-zero ARI ($-0.0008$) and low Silhouette Score (0.0710) for K-Means indicate that the 172-dimensional feature space does not naturally partition into clusters aligned with match outcomes, confirming that supervised learning is necessary for this task.
+\paragraph{Confusion matrix.}
+Table~\ref{tab:cm_lr}: baseline LR; rows = true, columns = predicted.
+
+\begin{table}[H]
+\centering
+\caption{Confusion matrix: Logistic Regression (baseline) on test set.}
+\label{tab:cm_lr}
+\begin{tabular}{cc|cc}
+ & & \multicolumn{2}{c}{\textbf{Predicted}} \\
+ & & Team~2 (0) & Team~1 (1) \\
+\hline
+\textbf{True} & Team~2 (0) & TN = 221 & FP = 163 \\
+ & Team~1 (1) & FN = 145 & TP = 224 \\
+\end{tabular}
+\end{table}
+
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.6\textwidth]{"Graphs/Confuxion_Matrix_Logistic_Reversion.png"}
+\caption{Confusion matrix: Logistic Regression baseline.}
+\label{fig:cm_lr}
+\end{figure}
+
+Models are \textbf{marginally better than random} (50\%): baseline LR achieves 55.91\% and the best model 58.70\%, an improvement of roughly nine percentage points. Near-equal false positive and false negative counts indicate weak class separation. The Decision Tree (Figure~\ref{fig:cm_dt}) performs similarly but with slightly lower accuracy.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.6\textwidth]{"Graphs/Confusion_Matrix_Decision_Tree.png"}
+\caption{Confusion matrix: Decision Tree.}
+\label{fig:cm_dt}
+\end{figure}
+
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{"Graphs/All Models Accuracy Comparison _ Top 5 Models.png"}
+\caption{Top five models by accuracy; LR+FS best (58.70\%).}
+\label{fig:all_models}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{"Graphs/All Models Accuracy Comparison _ Top 5 Models - Metrics.png"}
+\caption{Top five models: precision, recall, F1.}
+\label{fig:all_models_metrics}
+\end{figure}
+
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{"Graphs/Model Accuracy Comparison Top 3 Models.png"}
+\caption{Top three models comparison.}
+\label{fig:top3_models}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{"Graphs/Model Accuracy Comparison and Detailed Metrics Comparison.png"}
+\caption{All models: accuracy and metrics.}
+\label{fig:model_metrics}
+\end{figure}
+
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{"Graphs/Optimized Models Accuracy and Top 3 Optimized.png"}
+\caption{Optimised models post-tuning.}
+\label{fig:optimized_models}
+\end{figure}
+
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{"Graphs/Actual Classes(PCA Visualization) K-Means Clusters (PCA Visualization).png"}
+\caption{PCA: true outcomes vs.\ K-Means clusters ($k=2$); ARI $\approx 0$.}
+\label{fig:pca_kmeans}
+\end{figure}
+
+\paragraph{Interpretation.}
+The best-performing model, \textbf{LR with Feature Selection} at 58.70\%, improves over the baseline by 2.79\%. This must be interpreted \textbf{critically}: 58.7\% accuracy is barely above random chance (50\% for balanced binary classification). The modest gain reflects the fundamental unpredictability of match outcomes---a problem with a \textbf{gambling-like nature}, akin to football matches or roulette, where outcomes are inherently stochastic. Esports literature typically reports pre-match accuracies in the 55--65\% range; our results sit within this band. Despite trying over sixty model configurations, ensembles, and hyperparameter combinations, we could not exceed approximately 60\% on this dataset; further gains would likely require a different dataset (e.g., in-game state, map-specific data). K-Means (ARI $\approx 0$) confirms that unsupervised methods cannot recover outcomes.
 
 \subsubsection{1.4.4\quad Model Improvements}
 
-The following advanced techniques were applied iteratively to improve upon the baseline:
+Substantial effort was devoted to hyperparameter tuning via \texttt{GridSearchCV} and \texttt{RandomizedSearchCV} with three-fold cross-validation. Table~\ref{tab:hyperparameter_tuning} documents the parameter grids, search methods, and best configurations.
 
-\begin{enumerate}[leftmargin=1.5em]
-    \item \textbf{Random Forest:} An ensemble of 100 decision trees, reducing variance through bagging. Consistently outperforms the single Decision Tree.
-    \item \textbf{Gradient Boosting:} Sequential ensemble trained with \texttt{n\_estimators=100}, \texttt{max\_depth=5}, \texttt{learning\_rate=0.1}, and \texttt{subsample=0.8}.
-    \item \textbf{Hyperparameter Tuning:} \texttt{GridSearchCV} with 3-fold cross-validation was applied to optimise Random Forest parameters (\texttt{n\_estimators}, \texttt{max\_depth}, \texttt{min\_samples\_split}).
-    \item \textbf{XGBoost:} Gradient boosting via the XGBoost library, further tuned using \texttt{RandomizedSearchCV} (20 iterations, \texttt{cv=3}) over \texttt{n\_estimators}, \texttt{max\_depth}, \texttt{learning\_rate}, \texttt{subsample}, and \texttt{colsample\_bytree}.
-    \item \textbf{Soft Voting Ensemble:} Combines probability outputs from Logistic Regression, Random Forest, Gradient Boosting, and XGBoost.
-    \item \textbf{Stacking Ensemble:} Base model out-of-fold predictions used as inputs to a meta-learner, enabling adaptive model combination.
-    \item \textbf{Decision Threshold Optimisation:} Rather than the default 0.5 threshold, the optimal threshold was identified by maximising accuracy on cross-validated out-of-fold probabilities, achieving 0.5–1.5\% additional accuracy without retraining.
-\end{enumerate}
+\begin{table}[H]
+\centering
+\caption{Systematic hyperparameter tuning: parameter grids and best configurations.}
+\label{tab:hyperparameter_tuning}
+\small
+\renewcommand{\arraystretch}{1.6}
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.4cm}>{\raggedright\arraybackslash}p{5.2cm}>{\raggedright\arraybackslash}p{4.2cm}>{\raggedleft\arraybackslash}p{2.6cm}}
+\toprule
+\textbf{Model} & \textbf{Parameter grid} & \textbf{Best parameters} & \textbf{CV / test} \\
+\midrule
+\mbox{Logistic Regression} & $C \in \{0.01, 0.1, 1, 10\}$; \texttt{class\_weight} & $C = 0.01$ (stronger regularisation) & 58.30\% \\
+\mbox{Random Forest} & \texttt{n\_estimators} $\in \{50, 100\}$, \texttt{max\_depth} $\in \{10, 15, 20\}$, \texttt{min\_samples\_split} $\in \{10, 20\}$ & \texttt{max\_depth}=10, \texttt{min\_samples\_split}=10, \texttt{n\_estimators}=100 & 58.57 / 58.03\% \\
+\mbox{XGBoost} & \texttt{n\_estimators} $\in \{100, 200\}$, \texttt{max\_depth} $\in \{4, 6, 8\}$, \texttt{learning\_rate} $\in \{0.05, 0.1\}$, \texttt{subsample} $\in \{0.8, 0.9\}$ & \texttt{learning\_rate}=0.05, \texttt{max\_depth}=4, \texttt{n\_estimators}=100, \texttt{subsample}=0.8 & 58.07\% \\
+\mbox{LightGBM} & \texttt{n\_estimators} $\in \{200, 300\}$, \texttt{max\_depth} $\in \{5, 7, 9\}$, \texttt{learning\_rate} $\in \{0.03, 0.05, 0.1\}$, \texttt{subsample} $\in \{0.8, 0.9\}$ & \texttt{learning\_rate}=0.03, \texttt{max\_depth}=5, \texttt{n\_estimators}=200, \texttt{subsample}=0.8 & 56.98\% \\
+\midrule
+\multicolumn{4}{>{\raggedright\arraybackslash}p{15.2cm}}{\textit{Extended tuning:} \texttt{RandomizedSearchCV} for XGBoost and LightGBM with expanded grids (\texttt{colsample\_bytree}, \texttt{num\_leaves}, etc.). Decision threshold sweep over 0.38--0.63 on out-of-fold probabilities.} \\
+\multicolumn{4}{>{\raggedright\arraybackslash}p{15.2cm}}{\textit{Note:} Candidates evaluated---RF: 12, XGBoost: 24, LightGBM: 36 (three-fold CV).} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Despite extensive tuning, \textbf{LR with Feature Selection} (58.70\%) remained the best model; tuned Random Forest (58.03\%) came closest. Techniques applied: \texttt{SelectFromModel} based on Random Forest importance (retaining the top fifty features); LR with Feature Selection; tuned Random Forest, XGBoost, and LightGBM via GridSearchCV and RandomizedSearchCV; Soft Voting and Stacking ensembles; decision threshold optimisation over 0.38--0.63. None exceeded LR with Feature Selection.
 
 \subsubsection{1.4.5\quad Feature Importance}
 
@@ -279,87 +438,98 @@ Table~\ref{tab:features} presents the top 5 most predictive features identified 
 \toprule
 \textbf{Rank} & \textbf{Feature} & \textbf{Importance} \\
 \midrule
-1 & \texttt{rank\_diff}              & 0.0704 \\
-2 & \texttt{t1\_avg\_impact}         & 0.0593 \\
-3 & \texttt{t1\_player5\_multikill\_perc} & 0.0574 \\
-4 & \texttt{t2\_avg\_impact}         & 0.0544 \\
-5 & \texttt{t1\_avg\_rating}         & 0.0496 \\
+1 & \texttt{rank\_diff}                    & 0.0836 \\
+2 & \texttt{t1\_avg\_rating}               & 0.0280 \\
+3 & \texttt{t1\_player2\_clutch\_win\_perc} & 0.0267 \\
+4 & \texttt{t2\_avg\_rating}               & 0.0262 \\
+5 & \texttt{t2\_player5\_clutch\_win\_perc} & 0.0260 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The prominence of \texttt{rank\_diff} and team-average metrics confirms that macro-level team quality is the strongest predictor of match outcome, with individual player impact providing secondary signals.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth,height=0.32\textheight,keepaspectratio]{"Graphs/Top_15_Feature_Importance.png"}
+\caption{Top fifteen features: Decision Tree importance.}
+\label{fig:top15_features}
+\vspace{0.3em}
+\includegraphics[width=0.9\textwidth,height=0.32\textheight,keepaspectratio]{"Graphs/Top 20 Feature Importance - Basic Catboost.png"}
+\caption{Top twenty features: CatBoost; aligns with Decision Tree.}
+\label{fig:top20_catboost}
+\end{figure}
+
+\texttt{rank\_diff} and team-average ratings dominate; Figures~\ref{fig:top15_features} and \ref{fig:top20_catboost} confirm cross-model agreement.
 
 \subsubsection{1.4.6\quad Interpretation}
 
-Logistic Regression outperforming the Decision Tree suggests that the relationship between features and match outcomes is largely linear. Rank difference and average player ratings appear to capture the dominant signal, and these have approximately linear relationships with winning probability. XGBoost's improved performance over Logistic Regression indicates the presence of subtle non-linear interactions between features that linear models cannot capture.
-
-Achieving approximately 59\% accuracy on a balanced binary classification task is meaningful. It represents a substantial improvement over random chance (50\%) and is consistent with the academic literature on esports match prediction, which typically reports 55--65\% pre-match accuracy. The remaining unpredictability reflects the inherent stochasticity of individual match outcomes, where even the strongest teams can be defeated on any given day.
+Logistic Regression outperforming the Decision Tree indicates that the relationship between features and match outcomes is largely linear. Over sixty configurations were tried across ten model types (Logistic Regression, Decision Tree, Random Forest, Gradient Boosting, XGBoost, LightGBM, CatBoost, Voting Classifier, Stacking Classifier, and K-Means); the best remained LR with Feature Selection at 58.70\%. \textbf{Critical assessment:} The problem has a \textbf{gambling-like nature}---like predicting football match results or roulette spins, outcomes are inherently stochastic. Predictions are indicative rather than definitive; the model must \textbf{not} be deployed for betting or gambling purposes (Section~1.5).
 
 % ───────────────────────────────────────────────────────────────────────────
 \subsection{1.5\quad Ethical Considerations (5\%)}
 
-\subsubsection{1.5.1\quad Potential Biases and Fairness Issues}
+\subsubsection{1.5.1\quad Potential Biases}
 
-\paragraph{1. Temporal Bias.}
-The dataset spans multiple years of CSGO competitive play. Over time, the game's ``meta'' (dominant strategies, weapon meta, map pools) evolves through developer patches. A model trained on historical data may systematically favour outdated patterns, producing predictions biased against teams that have adapted to the current competitive environment. This is a form of \textit{concept drift}, a known challenge in time-series classification.
-
-\paragraph{2. Team Representation Bias.}
-Top-ranked teams compete more frequently and are disproportionately represented in the dataset. This creates a risk of overfitting to the playstyle of elite teams. Underrepresented lower-ranked or regional teams receive fewer training examples, and the model may produce systematically less accurate predictions for them -- a fairness concern if deployed for scouting or analytical purposes.
-
-\paragraph{3. Ranking System Bias.}
-World rankings are a lagging indicator, updated based on recent results and points accumulation. Teams that have recently changed rosters, coaches, or strategies may carry outdated rankings that no longer reflect their true competitive strength. Since \texttt{rank\_diff} is the single most important feature, the model inherits this structural limitation of the ranking system.
-
-\paragraph{4. Data Collection Bias.}
-The dataset appears to primarily cover major international tournaments. Matches from regional leagues, minor competitions, or underrepresented geographic areas are likely absent. This geographic and prestige-based skew means the model may produce unreliable predictions for match types outside its training distribution.
-
-\paragraph{5. Player Performance Aggregation Bias.}
-Aggregated team statistics (average rating, average KDR) may fail to capture team chemistry, strategic role specialisation, or situational performance under pressure. A team with one exceptional player and four average teammates may present similar aggregate statistics to a more balanced roster, masking fundamentally different team dynamics.
+\textbf{1. Temporal:} The dataset spans multiple years; CSGO meta evolves through patches and map pool changes---a concept drift risk. \textbf{2. Team representation:} Top-ranked teams compete more frequently and dominate the dataset; the model may underperform on lower-ranked or regional teams. \textbf{3. Ranking:} \texttt{rank\_diff} relies on world rankings, which are lagging indicators; roster or strategy changes may not be reflected. \textbf{4. Data collection:} Major international tournaments are over-represented; regional leagues underrepresented. \textbf{5. Aggregation:} Team-level averages may miss team chemistry and role specialisation.
 
 \subsubsection{1.5.2\quad Mitigation Strategies}
 
-\paragraph{1. Temporal Validation.}
-Implement time-based cross-validation, training exclusively on earlier matches and evaluating on later ones, to ensure the model generalises across time periods rather than memorising era-specific patterns. Regularly retrain with recent data and consider incorporating recency features such as rolling averages over the last 10 matches or days since the last roster change.
+\textbf{1. Temporal:} Implement time-based cross-validation; retrain with post-patch data; add recency features (e.g., rolling rating over the last ten matches). \textbf{2. Representation:} Apply stratified sampling by team tier and region when constructing train/test sets. \textbf{3. Rankings:} Prioritise relative features (\allowbreak\texttt{rank\_diff}, rating difference) rather than absolute values. \textbf{4. Data:} Expand to regional leagues; document which tournaments and date ranges are covered. \textbf{5. Auditing:} Maintain interpretable models; conduct fairness audits comparing accuracy across tiers and regions.
 
-\paragraph{2. Balanced and Representative Sampling.}
-Apply stratified sampling by team and geographic region when constructing training and test sets. Consider class-weighted loss functions that penalise misclassification of underrepresented teams more heavily, promoting fairer model behaviour across the full competitive landscape.
+\textbf{6. Gambling:} The model must \textbf{not} be used for betting---the problem is inherently stochastic (like football or roulette); 58.7\% versus 50\% is marginal. Communicate uncertainty; comply with GDPR for player data.
 
-\paragraph{3. Relative Feature Engineering.}
-Prioritise relative features (rank difference, rating difference) rather than absolute values, reducing systematic biases tied to ranking inflation or scale differences across time periods. Relative features are also more interpretable and generalisable.
+\textbf{7. Transparency:} Document HLTV sources, preprocessing steps, and limitations; share with stakeholders (analysts, broadcasters, organisers) so they can judge when to trust predictions versus rely on expert judgment.
 
-\paragraph{4. Diverse Data Collection.}
-Expand the dataset to include regional leagues, online tournaments, and matches from a broader range of competitive tiers and geographic regions. Clearly document data collection methodology and known coverage gaps in any deployment context.
+\subsubsection{1.5.3\quad Key Recommendations}
 
-\paragraph{5. Interpretability and Fairness Auditing.}
-Maintain interpretable model variants (Logistic Regression, Decision Trees) alongside complex ensemble models. Conduct regular fairness audits to assess whether prediction accuracy differs systematically across team tiers, regions, or demographic groups. Publish feature importance analysis to stakeholders.
-
-\paragraph{6. Responsible Deployment Guidelines.}
-The model must not be used to facilitate or influence sports betting markets, which raises serious ethical and legal concerns in many jurisdictions. Any public deployment should clearly communicate model uncertainty, confidence intervals, and known limitations. Player performance data must be handled in compliance with relevant data protection legislation (e.g., GDPR), and players should retain visibility over how their data is used.
-
-\paragraph{7. Transparency and Documentation.}
-All modelling decisions, training data sources, preprocessing steps, and known limitations should be fully documented and made available to affected stakeholders -- including teams, players, and tournament organisers -- to enable informed decision-making and accountability.
+Key recommendations: (one) use the best-performing model, LR with Feature Selection, for match predictions; (two) retrain with recent data to account for meta-game changes; (three) monitor performance across different teams and time periods; (four) validate predictions with domain experts before deployment. Do not deploy for betting or gambling purposes.
 
 % ═══════════════════════════════════════════════════════════════════════════
-%  REFERENCES
+%  SECTION 2 -- DATASET 2 (TEXT / NLP / DEEP LEARNING)
+% ═══════════════════════════════════════════════════════════════════════════
+\newpage
+\section{Section 2 -- Natural Language Processing and Deep Learning (Dataset 2)}
+
+\noindent\textit{This section covers Dataset 2: sentiment analysis of CSGO Steam reviews to classify reviews as positive or negative. The dataset is publicly available on Kaggle: \url{https://www.kaggle.com/datasets/noahx1/csgo-steam-reviews}.}
+
+\subsection{2.1\quad Text Dataset Selection and Preprocessing (15\%)}
+
+The CSGO Steam Reviews dataset will be used for sentiment analysis: classifying reviews as positive or negative to derive an overall rating or sentiment score. Preprocessing will include: text cleaning, tokenisation, stopword removal, and pre-trained embeddings (e.g., GloVe, Word2Vec). Dataset source: \url{https://www.kaggle.com/datasets/noahx1/csgo-steam-reviews}.
+
+\subsection{2.2\quad Deep Learning Model Implementation (20\%)}
+
+\noindent\textit{[To be completed: Neural network design (RNN, LSTM); layer descriptions---embeddings, recurrent, fully connected, dropout, early stopping; hyperparameter tuning.]}
+
+\subsection{2.3\quad Evaluation and Insights (10\%)}
+
+\noindent\textit{[To be completed: Evaluation metrics---confusion matrix, accuracy, precision, recall; loss curves; strengths, limitations, and areas for improvement.]}
+
+% ═══════════════════════════════════════════════════════════════════════════
+%  REFERENCES (Harvard style, alphabetical order)
 % ═══════════════════════════════════════════════════════════════════════════
 \newpage
 \section{References}
 
-\begin{enumerate}[leftmargin=1.5em, label={[\arabic*]}]
+\begin{list}{}{%
+  \setlength{\leftmargin}{2em}%
+  \setlength{\itemindent}{-2em}%
+  \setlength{\itemsep}{0.75em}%
+  \setlength{\parsep}{0pt}}
 
-    \item Chen, T. and Guestrin, C. (2016) `XGBoost: A Scalable Tree Boosting System', \textit{Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining}, pp.\ 785--794. Available at: \url{https://doi.org/10.1145/2939672.2939785} (Accessed: [add date]).
+\item Chen, T. and Guestrin, C. (2016) `XGBoost: A Scalable Tree Boosting System', \textit{Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining}, pp.\ 785--794. Available at: \url{https://doi.org/10.1145/2939672.2939785} (Accessed: 7 February 2025).
 
-    \item Pedregosa, F.\ et al.\ (2011) `Scikit-learn: Machine Learning in Python', \textit{Journal of Machine Learning Research}, 12, pp.\ 2825--2830. Available at: \url{https://jmlr.org/papers/v12/pedregosa11a.html} (Accessed: [add date]).
+\item Harris, C.R., Millman, K.J., van der Walt, S.J. \textit{et al}. (2020) `Array programming with NumPy', \textit{Nature}, 585, pp.\ 357--362. Available at: \url{https://doi.org/10.1038/s41586-020-2649-2} (Accessed: 7 February 2025).
 
-    \item Harris, C.R.\ et al.\ (2020) `Array programming with NumPy', \textit{Nature}, 585, pp.\ 357--362. Available at: \url{https://doi.org/10.1038/s41586-020-2649-2} (Accessed: [add date]).
+\item HLTV.org (2024) \textit{CSGO Match Statistics}. Available at: \url{https://www.hltv.org} (Accessed: 7 February 2025).
 
-    \item McKinney, W. (2010) `Data Structures for Statistical Computing in Python', \textit{Proceedings of the 9th Python in Science Conference}, pp.\ 56--61.
+\item Kaggle (2024) \textit{Counter-Strike: Global Offensive matches}. Available at: \url{https://www.kaggle.com/datasets/gabrieltardochi/counter-strike-global-offensive-matches} (Accessed: 7 February 2025).
 
-    \item HLTV.org (2024) \textit{CSGO Match Statistics}. Available at: \url{https://www.hltv.org} (Accessed: [add date]).
+\item Kaggle (2024) \textit{CSGO Steam Reviews}. Available at: \url{https://www.kaggle.com/datasets/noahx1/csgo-steam-reviews} (Accessed: 7 February 2025).
 
-    \item [Add any additional references cited in your report in Harvard style.]
+\item McKinney, W. (2010) `Data structures for statistical computing in Python', in van der Walt, S. and Millman, J. (eds) \textit{Proceedings of the 9th Python in Science Conference}, pp.\ 56--61.
 
-\end{enumerate}
+\item Pedregosa, F., Varoquaux, G., Gramfort, A. \textit{et al}. (2011) `Scikit-learn: Machine learning in Python', \textit{Journal of Machine Learning Research}, 12, pp.\ 2825--2830. Available at: \url{https://jmlr.org/papers/v12/pedregosa11a.html} (Accessed: 7 February 2025).
+
+\end{list}
 
 % ═══════════════════════════════════════════════════════════════════════════
 \end{document}

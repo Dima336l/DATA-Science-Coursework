@@ -1,0 +1,659 @@
+\documentclass[12pt,a4paper]{article}
+
+% ─── Packages ────────────────────────────────────────────────────────────────
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{helvet}          % Arial-like font
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{setspace}
+\usepackage{parskip}
+\usepackage{titlesec}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{graphicx}
+\usepackage{grffile}
+\usepackage{float}
+\usepackage{amsmath}
+\usepackage{amssymb} % \mathbb (e.g.\ expectation in ARI formula)
+\usepackage{hyperref}
+\usepackage{xurl} % allow line breaks inside long \url{...} (e.g.\ Kaggle links)
+\usepackage{caption}
+\usepackage{fancyhdr}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{microtype}
+\usepackage{ragged2e}
+\justifying
+
+% ─── Page style (Dataset~1 only) ────────────────────────────────────────────
+\fancypagestyle{secOne}{%
+  \fancyhf{}%
+  \fancyhead[L]{CSGO match prediction (Dataset~1)}%
+  \fancyhead[R]{CST3133 Coursework}%
+  \fancyfoot[C]{\thepage}%
+}
+\pagestyle{secOne}
+
+% ─── Section formatting ───────────────────────────────────────────────────────
+\titleformat{\section}{\large\bfseries}{}{0em}{}[\titlerule]
+\titleformat{\subsection}{\normalsize\bfseries}{}{0em}{}
+\titleformat{\subsubsection}{\normalsize\itshape}{}{0em}{}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\onehalfspacing
+
+% ─── Hyperlink setup ─────────────────────────────────────────────────────────
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=blue,
+    citecolor=black
+}
+
+% Sklearn names in \texttt: break before final "CV" so long lines wrap in text/tables
+\newcommand{\GridSearchCVname}{\texttt{Grid\allowbreak Search\allowbreak CV}}
+\newcommand{\RandomizedSearchCVname}{\texttt{Randomized\allowbreak Search\allowbreak CV}}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{document}
+
+% ═══════════════════════════════════════════════════════════════════════════
+%  COVER PAGE
+% ═══════════════════════════════════════════════════════════════════════════
+\begin{titlepage}
+    \noindent
+    \begin{flushright}
+    \includegraphics[height=3cm]{"Dataset1 report images/middlesexuniversity.png"}
+    \end{flushright}
+    \vspace{0.5cm}
+    \centering
+    \vspace*{0.5cm}
+
+    {\Large \textbf{MIDDLESEX UNIVERSITY}}\\[0.3cm]
+    {\normalsize The Burroughs, Hendon, London NW4 4BT}\\[2cm]
+
+    \rule{\linewidth}{0.5pt}\\[0.5cm]
+    {\LARGE \textbf{CST3133 Coursework}}\\[0.3cm]
+    {\Large Applied Data Science and AI Workflow}\\[0.3cm]
+    {\large Part 1 -- Dataset 1 (Structured Data)}\\[0.3cm]
+    \rule{\linewidth}{0.5pt}\\[2cm]
+
+    {\large
+    \begin{tabular}{ll}
+        \textbf{Group Members}          & \\[0.2cm]
+        Dumitru Nirca                   & M00888146 \\[0.2cm]
+        Sebastian Robert Danci          & M00886707 \\[0.2cm]
+        Maciej Kacper Ciba              & M00864763 \\[0.2cm]
+        Peter Nagy                      & M00871555 \\[0.5cm]
+        \textbf{Module}                 & CST3133 -- Advanced Topics in Data Science and AI \\[0.3cm]
+        \textbf{Module Leader}          & Dr.\ Halil Yetgin \\
+    \end{tabular}
+    }
+
+    \vfill
+    {\normalsize Word count (Part 1): 4,000}\\[0.15cm]
+    {\normalsize Academic Year 2025/2026}
+\end{titlepage}
+
+% ═══════════════════════════════════════════════════════════════════════════
+%  TABLE OF CONTENTS
+% ═══════════════════════════════════════════════════════════════════════════
+\newpage
+\tableofcontents
+\listoffigures
+\listoftables
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════════════
+%  SECTION 1 -- DATASET 1 (STRUCTURED DATA)
+% ═══════════════════════════════════════════════════════════════════════════
+\section{Section 1 -- Traditional Machine Learning Workflow and Ethics (Dataset 1)}
+
+\noindent\textit{Dataset~1 is binary prediction of professional CSGO match winners from team- and player-level pre-match statistics.} Match outcomes are hard to predict from pre-match rows alone: fifty per cent is guessing, and low-sixties accuracy is already strong; similar work sometimes reaches about sixty-five per cent when neural models or extra context are added. The section covers cleaning, EDA, linear and tree models, CatBoost, K-Means as a sanity check, tuning, feature importance, and a short ethics discussion. Numbers below are on a held-out test set; leakage columns are stripped before training.
+
+\paragraph{Introduction and Objectives.}
+The work follows a standard supervised pipeline on tabular match data: define the task, clean the rows, explore patterns, fit several model families, and state clearly what the scores do and do not mean. The emphasis is practical---imputation choices, engineered fields, which models gain accuracy---rather than chasing an isolated leaderboard number. The aim is accuracy clearly above random (50\%) with interpretable models, and an explicit account of where the data and the task fall short.
+
+The implementation uses Python (pandas, NumPy, scikit-learn). Seeds are fixed where it matters so splits and grid searches can be replayed. The inputs are clean columns; the outcomes are not---matches stay partly random even when the features look sensible.
+
+% ───────────────────────────────────────────────────────────────────────────
+\subsection{1.1\quad Dataset Selection and Problem Definition}
+
+\subsubsection{1.1.1\quad Dataset Overview}
+
+The \textbf{CSGO Match Prediction} set is historical pro matches with team- and player-level pre-match fields (Kaggle: \url{https://www.kaggle.com/datasets/gabrieltardochi/counter-strike-global-offensive-matches}). The file \texttt{csgo\_games.csv} is included with the coursework submission. Raw: three thousand seven hundred and eighty-seven rows, one hundred and seventy columns; after cleaning and engineering, three thousand seven hundred and sixty-three rows and one hundred and seventy-two numeric features.
+
+Table~\ref{tab:features_overview} breaks the columns down.
+
+\begin{table}[H]
+\centering
+\caption{Exact feature inventory and descriptions.}
+\label{tab:features_overview}
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+\textbf{Category} & \textbf{Features (exact names and meanings)} \\
+\midrule
+Team-level (raw) & \texttt{t1\_world\_rank}, \texttt{t2\_world\_rank} (world rankings 1--$\infty$); \texttt{t1\_h2h\_win\_perc}, \texttt{t2\_h2h\_win\_perc} (head-to-head win \%); \texttt{t1\_points}, \texttt{t2\_points} (removed before modelling---data leakage). \\
+\midrule
+Player-level (per player) & For each of \texttt{t1\_player1}--\texttt{t1\_player5} and \texttt{t2\_player1}--\texttt{t2\_player5}: \texttt{rating} (HLTV), \texttt{impact}, \texttt{kdr}, \texttt{dmr}, \texttt{kpr}, \texttt{apr}, \texttt{dpr}, \texttt{spr}, \texttt{opk\_ratio}, \texttt{opk\_rating}, \texttt{wins\_perc\_after\_fk}, \texttt{fk\_perc\_in\_wins}, \texttt{multikill\_perc}, \texttt{rating\_at\_least\_one\_perc}, \texttt{is\_sniper}, \texttt{clutch\_win\_perc}. \\
+\midrule
+Engineered & \texttt{t1\_avg\_rating}, \texttt{t2\_avg\_rating}; \texttt{t1\_avg\_impact}, \texttt{t2\_avg\_impact}; \texttt{t1\_avg\_kdr}, \texttt{t2\_avg\_kdr}; \texttt{rank\_diff}; \texttt{h2h\_advantage}. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Target variable:} \texttt{winner}. The raw data include draws (twenty-four rows); these were \textbf{excluded} so the task is \textbf{binary}: Team~1 win versus Team~2 win. After removal, class proportions are near-balanced (51.05\% Team~1 / 48.95\% Team~2 on three thousand seven hundred and sixty-three rows), so no oversampling or class weighting is required. Labels are encoded as Team~1 $\rightarrow$ \texttt{0} and Team~2 $\rightarrow$ \texttt{1}; confusion matrices and classification reports below follow that convention.
+
+\paragraph{Unit of analysis and limitations of the snapshot.}
+Each row represents one professional match with features aggregated or recorded before the match starts (after leakage columns are removed). The dataset does not contain map veto order, server side, or live economy; those omitted factors contribute residual variance and help explain why accuracy stays in a modest band above chance. The twenty-four excluded draws and any rows failing validation leave three thousand seven hundred and sixty-three matches for modelling. Users of the model should treat predictions as conditional on the feature set actually present in \texttt{csgo\_games.csv}, not on full tactical context.
+
+\subsubsection{1.1.2\quad Problem Definition}
+
+\textbf{Task.} Predict the match winner from \textbf{binary} pre-match rows only (Team~1 vs.\ Team~2 after dropping draws).
+
+In practice a model like this is mainly a planning aid: it can suggest who starts as slight favourite or feed internal discussion---it is not presented as something you could trade on. CS matches stay hard to call from pre-match rows alone; important factors simply are not in the table. With balanced classes, \textbf{fifty per cent} is the chance baseline, so \textbf{sixty per cent test accuracy} shows real learning rather than a useless fit. Other tabular pre-match studies in the literature often plateau near \textbf{sixty-five per cent} once authors add neural nets or extra context, which is the right ballpark for what extra data and modelling can buy. The numbers read as probabilities, not as fixed outcomes.
+
+\paragraph{Success criteria and non-goals.}
+The coursework mark rests on a defensible pipeline---data handling, exploration, several model families, tuning, and ethics---not on beating every published benchmark that uses different features or modalities. No claim is made that the model is suitable for betting: the accuracy range rules that out. The useful takeaway is which signals move the needle (\texttt{rank\_diff}, team ratings) and how wide the error bars remain.
+
+% ───────────────────────────────────────────────────────────────────────────
+\subsection{1.2\quad Data Preprocessing}
+
+\subsubsection{1.2.1\quad Handling Missing Values and Noise}
+
+Missing counts land at six thousand seven hundred and forty-three, mostly in player-level stats. \textbf{Imputation:} column medians for numerics (ratings and combat stats have heavy tails) and mode for any categoricals.
+
+\begin{figure}[H]
+\centering
+% Chart is very wide: width was binding before (so extra height had no effect). Allow modest bleed into side margins for a visibly larger plot.
+\makebox[\linewidth][c]{%
+  \includegraphics[width=\dimexpr\linewidth+26mm\relax,height=0.84\textheight,keepaspectratio]{"Dataset1 report images/missing_values_by_column.png"}%
+}%
+\caption{Missing values by column before imputation; guided imputation strategy.}
+\label{fig:missing}
+\end{figure}
+
+\noindent Gaps cluster in player-level statistics rather than team-level aggregates, which supports median imputation on numeric combat and rating fields. Table~\ref{tab:before_after} summarises before and after preprocessing.
+
+\begin{table}[H]
+\centering
+\caption{Data quality: before and after preprocessing.}
+\label{tab:before_after}
+\begin{tabularx}{\textwidth}{l>{\raggedright\arraybackslash}X>{\centering\arraybackslash}X}
+\toprule
+\textbf{Aspect} & \textbf{Before (with NaN / noise)} & \textbf{After (processed)} \\
+\midrule
+Rows & 3,787 & 3,763 \\
+Columns / features & 170 & 172 (numerical only) \\
+Missing values & 6,743 (imputed) & 0 \\
+Outliers & Present (median imputation) & Retained, scaled \\
+Leakage features & \texttt{t1\_points}, \texttt{t2\_points} & Removed (tournament points) \\
+Train / test split & Not applied (single cleaned frame) & 3,010 / 753 (stratified 80/20) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Outliers were identified via boxplot inspection of key features (e.g., \texttt{rank\_diff}, ratings), right-skewed distributions in world rankings, and domain knowledge---exceptional player performances (e.g., KDR above two) are valid but rare. Median imputation was chosen for robustness to extremes. Range validation confirmed no impossible values (e.g., negative percentages). After imputation, the dataset contains zero missing values.
+
+\paragraph{Alternative imputations considered.}
+Means would pull skewed rating tails toward the middle; kNN imputation can leak structure if neighbours are picked before a proper split, so it was not used ahead of the train/test cut. Full multiple imputation is overkill for a single prediction pipeline at this size; a single completed table is reported. Informal checks (subset of columns to zero or mean-fill) nudged test accuracy by under a point---suggesting the bottleneck is signal, not the imputer.
+
+The submission includes \texttt{csgo\_games.csv} and a short note on the cleaning steps.
+
+\paragraph{Leakage control and reproducibility.}
+Standings-style point columns that update after the match are dropped before any fit; otherwise the model could cheat. The split is stratified eighty/twenty on \texttt{winner} so neither side is starved in train or test. \texttt{StandardScaler} is fit on train rows only, then applied to test---no test means in the scaler. Routine practice, but worth stating because the headline numbers depend on it.
+
+\newpage
+\subsubsection{1.2.2\quad Feature Engineering and Scaling}
+
+\textbf{Eight engineered features:}
+
+\begin{table}[H]
+\centering
+\caption{Engineered features and their rationale.}
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+\textbf{Feature} & \textbf{Description and Rationale} \\
+\midrule
+\texttt{t1\_avg\_rating}, \texttt{t2\_avg\_rating} & Average HLTV rating across each team's five players. Player rating is the primary individual performance metric in professional CSGO. \\
+\texttt{t1\_avg\_impact}, \texttt{t2\_avg\_impact} & Average impact score per team, measuring round-winning contributions beyond kills. \\
+\texttt{t1\_avg\_kdr}, \texttt{t2\_avg\_kdr} & Average Kill-Death Ratio per team, a standard measure of individual survivability and lethality. \\
+\texttt{rank\_diff} & Difference in world rankings (\texttt{t1\_world\_rank} $-$ \texttt{t2\_world\_rank}). Captures the relative competitive strength gap. \\
+\texttt{h2h\_advantage} & Difference in head-to-head win percentages. Captures historical team-versus-team performance patterns. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Tournament point columns \texttt{t1\_points} and \texttt{t2\_points} were dropped to prevent \textbf{data leakage}, as they reflect standings updated after matches and would not be legitimate pre-match inputs. All one hundred and seventy-two retained numerical features were standardised using \textbf{StandardScaler}; the target was encoded (\texttt{t1}$\rightarrow$0, \texttt{t2}$\rightarrow$1). The final split is three thousand and ten training samples and seven hundred and fifty-three test samples (stratified eighty/twenty).
+
+\paragraph{Rationale for engineered aggregates.}
+Averaging players into team-level stats tracks strength without baking in roster IDs that churn between seasons. \texttt{rank\_diff} and \texttt{h2h\_advantage} describe the \textit{matchup} (``better rank on paper but bad h2h''), not raw ranks in isolation. The engineered block was kept deliberately small: enough signal for logistic regression and trees without a hundred interaction terms.
+
+% ───────────────────────────────────────────────────────────────────────────
+\subsection{1.3\quad Exploratory Data Analysis}
+
+\subsubsection{1.3.1\quad Class Distribution}
+
+After removing draws, Team~1 wins slightly outnumber Team~2 wins (51.05\% / 48.95\% in the modelling frame). The stratified test split contains three hundred and eighty-four examples of class~\texttt{0} (Team~1) and three hundred and sixty-nine of class~\texttt{1} (Team~2). Accuracy therefore remains a reasonable headline metric alongside precision, recall, and F1.
+
+\subsubsection{1.3.2\quad Feature Distributions}
+
+Class counts sit close to fifty-fifty once draws are removed (Figure~\ref{fig:class_dist}). The histograms (Figure~\ref{fig:dist_key_features}) look like typical esports data: ranks pile up at the top, ratings sit near the HLTV baseline of one, and \texttt{rank\_diff} stretches wide because the sheet mixes mismatches and close games.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth,height=0.58\textheight,keepaspectratio]{"Dataset1 report images/Distribution of Match Winners.png"}
+\caption{Match outcome distribution (t1 vs.\ t2); nearly balanced.}
+\label{fig:class_dist}
+\end{figure}
+
+\noindent Balanced labels mean accuracy is not meaningless here; precision, recall, and F1 are still reported so a silent bias toward Team~2 (or Team~1) would show up.
+
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{"Dataset1 report images/Distribution_of_key_features.png"}
+\caption{Key feature histograms: rankings, ratings, \texttt{rank\_diff}, \texttt{h2h\_advantage}.}
+\label{fig:dist_key_features}
+\end{figure}
+
+\noindent In short: a linear model has something to work with (rank and rating gaps), and trees still have room to carve non-linear pockets on top of that.
+
+\subsubsection{1.3.3\quad Feature Dependencies}
+
+\begin{figure}[H]
+\centering
+% Sized to sit below §1.3.2 on the same page (avoid a lone blank page band).
+\includegraphics[width=0.92\linewidth,height=0.32\textheight,keepaspectratio]{"Dataset1 report images/Corellation Features.png"}
+\caption{Correlation heatmap; informed feature selection.}
+\label{fig:correlation}
+\end{figure}
+
+\noindent The heatmap (Figure~\ref{fig:correlation}) is messy in the expected way: team average ratings move with their player inputs, and \texttt{rank\_diff} lines up with those aggregates. Collinearity motivates regularisation and forest-based selection rather than trusting every raw column at face value.
+
+\subsubsection{1.3.4\quad Key Trends}
+
+Better rank for Team~1 (more negative \texttt{rank\_diff}) lines up with more Team~1 wins---no surprise. Rank gaps and team averages do most of the work; clutch and multi-kill stats add a bit at the margin. Figures~\ref{fig:rank_diff_winner} and \ref{fig:team_ratings} spell it out visually.
+
+\paragraph{Head-to-head versus ranking.}
+Head-to-head catches stylistic history that pure rank ignores, but many pairs barely play each other, so \texttt{h2h\_advantage} is often thin or stale compared with \texttt{rank\_diff}. It still helps trees split on odd matchup histories and nudges logistic regression when rank alone lies.
+
+\begin{figure}[H]
+\centering
+\makebox[\linewidth][c]{%
+  \includegraphics[width=\dimexpr\linewidth+26mm\relax,height=0.84\textheight,keepaspectratio]{"Dataset1 report images/Rank_difference_by_winner_and_rank_distribtuion_by_winner.png"}%
+}%
+\caption{\texttt{rank\_diff} by winner; supports it as strong predictor.}
+\label{fig:rank_diff_winner}
+\end{figure}
+
+\noindent Figure~\ref{fig:rank_diff_winner} shows Team~1 wins associating with more favourable (more negative) \texttt{rank\_diff}, consistent with rank gap driving much of the signal.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{"Dataset1 report images/team 1 Rating_ Team 2 Rating.png"}
+\caption{Team ratings by outcome; higher ratings correlate with wins.}
+\label{fig:team_ratings}
+\end{figure}
+
+\noindent Figure~\ref{fig:team_ratings} plots team-average rating against outcome: the winning side tends to carry higher HLTV-style aggregates, in line with the engineered \texttt{t1\_avg\_rating} / \texttt{t2\_avg\_rating} features.
+
+\subsubsection{1.3.5\quad Potential Biases Identified in the Data}
+
+\begin{enumerate}[leftmargin=1.5em]
+    \item \textbf{Temporal Bias:} The dataset spans multiple competitive seasons. CSGO meta-game shifts (strategy, weapon balance, map pool) mean that patterns from earlier years may not generalise to more recent matches.
+    \item \textbf{Team Representation Bias:} Top-ranked teams compete more frequently and therefore dominate the dataset. The model may be poorly calibrated for underrepresented lower-ranked or regional teams.
+    \item \textbf{Ranking System Bias:} World rankings are a lagging indicator and do not immediately reflect roster changes or strategic pivots, introducing systematic noise in the most predictive feature.
+    \item \textbf{Coverage bias:} The sample is weighted toward high-tier international play visible on HLTV; casual or regional events may be underrepresented, so error rates may differ by competition tier.
+    \item \textbf{Label definition:} The target is match winner, not round differential or map score; close bo1 upsets and comfortable bo3 wins are treated identically once the match result is recorded.
+\end{enumerate}
+
+\paragraph{Link from EDA to modelling choices.}
+A line of best fit in rank/rating space already separates winners to some extent; what remains is noise. Logistic regression should therefore stay competitive, forests may add a few points, and very large models cannot invent signal---the inputs omit veto, maps, and same-day form. Single player statistics should not be read as sole drivers when team averages subsume much of the same information.
+
+% ───────────────────────────────────────────────────────────────────────────
+\subsection{1.4\quad Model Development and Evaluation}
+
+\subsubsection{1.4.1\quad Models Trained}
+
+Three broad model families were trained:
+
+\paragraph{Logistic Regression.} Linear model on the log-odds:
+\[
+\log\frac{P(y=1|\mathbf{x})}{1-P(y=1|\mathbf{x})}
+=
+\mathbf{w}^\top \mathbf{x} + b.
+\]
+It is the obvious first model: fast, inspectable, and probabilistic.
+
+\paragraph{Decision Tree.} Single tree with Gini splits, $G(t) = 1 - \sum_c p(c|t)^2$, \texttt{max\_depth}=10, \texttt{min\_samples\_split}=20 to keep it from memorising. Impurity-based importances come for free.
+
+\paragraph{K-Means.} Required unsupervised check: $k=2$ clusters in feature space, objective $\sum_i \sum_{\mathbf{x} \in C_i} \|\mathbf{x} - \boldsymbol{\mu}_i\|^2$. ARI against true winners is $\approx 0$, so unsupervised geometry does not recover the label---supervised models are doing real work, not picking up a trivial cluster structure.
+
+\paragraph{Heavier models (Figure~\ref{fig:models_accuracy}).}
+The experiments also include \textbf{Random Forest} (default and \GridSearchCVname{}-tuned), \textbf{XGBoost}, \textbf{LightGBM}, \textbf{CatBoost}, and \textbf{logistic regression with \texttt{SelectFromModel}} (fifty features from forest importance), plus voting/stacking runs where included in the comparison chart. On the test split \textbf{CatBoost} leads; tuned forests and sparse LR sit underneath. Boosting picks up small non-linearities; nothing approaches ninety per cent because the labels stay noisy.
+
+\subsubsection{1.4.2\quad Evaluation Metrics}
+
+For classification models:
+
+\begin{itemize}[leftmargin=1.5em]
+    \item \textbf{Accuracy:} $\frac{TP + TN}{TP + TN + FP + FN}$ --- proportion of correctly classified matches.
+    \item \textbf{Precision / recall / F1 (per class):} scikit-learn reports metrics for each label. With encoding \texttt{t1}$\rightarrow$0 and \texttt{t2}$\rightarrow$1, the conventional ``positive'' class in one-vs-rest terms is label~\texttt{1} (Team~2). Precision is $\frac{TP}{TP+FP}$ for that class; recall is $\frac{TP}{TP+FN}$.
+    \item \textbf{F1-Score:} harmonic mean of precision and recall for the class of interest; per-class and summary values appear alongside accuracy in the results tables.
+\end{itemize}
+
+For K-Means:
+\begin{itemize}[leftmargin=1.5em]
+    \item \textbf{Adjusted Rand Index (ARI):}
+    {\small
+    \[
+    \mathrm{ARI}
+    =
+    \frac{\mathrm{RI}-\mathbb{E}[\mathrm{RI}]}{\max(\mathrm{RI})-\mathbb{E}[\mathrm{RI}]}
+    \]
+    }
+    where RI is the Rand Index. Agreement between cluster assignments and true labels, corrected for chance. ARI $\approx 0$ indicates random assignment.
+    \item \textbf{Silhouette Score:} $s(i) = \frac{b(i) - a(i)}{\max(a(i), b(i))}$, where $a(i)$ is mean intra-cluster distance and $b(i)$ is mean nearest-cluster distance. Values near 1 indicate well-separated clusters.
+\end{itemize}
+
+\paragraph{Interpreting the metrics.}
+With balanced classes, accuracy is an honest headline; precision and recall per label (\texttt{0}/\texttt{1}) are still examined for asymmetry. F1 compresses that trade-off for the positive class (label~\texttt{1}). For K-Means, ARI scores clusters against \texttt{winner}; silhouette is reported as a geometric sanity check without using labels in the fit.
+
+\subsubsection{1.4.3\quad Results}
+
+Table~\ref{tab:results} presents the performance of all trained models on the held-out test set.
+
+\begin{table}[H]
+\centering
+\caption{Model performance summary on the held-out test set.}
+\label{tab:results}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Model} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1-Score} \\
+\midrule
+CatBoost (basic)              & 60.96\%  & 0.5969 & 0.6260 & 0.6111 \\
+LR with RF feature selection  & 58.70\%  & 0.5751 & 0.6016 & 0.5881 \\
+Random Forest (tuned)         & 57.64\%  & 0.5698 & 0.5528 & 0.5612 \\
+Random Forest                 & 56.97\%  & 0.5606 & 0.5637 & 0.5622 \\
+Logistic Regression           & 55.91\%  & 0.5476 & 0.5772 & 0.5620 \\
+Decision Tree                 & 53.78\%  & 0.5258 & 0.5799 & 0.5515 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent\textit{Note:} the comparison figures are produced from the same train--test split and preprocessing as Table~\ref{tab:results}. Unsupervised \textbf{K-Means} ($k{=}2$) provides contrast: PCA (Figure~\ref{fig:pca_kmeans}) shows clusters are not aligned with match winners (adjusted Rand index near zero).
+
+\paragraph{Confusion matrix.}
+Table~\ref{tab:cm_lr}: baseline logistic regression; rows = true class, columns = predicted class (\texttt{0}\,=\,Team~1, \texttt{1}\,=\,Team~2).
+
+\begin{table}[H]
+\centering
+\caption{Confusion matrix: Logistic Regression (baseline) on test set.}
+\label{tab:cm_lr}
+\begin{tabular}{cc|cc}
+ & & \multicolumn{2}{c}{\textbf{Predicted}} \\
+ & & Team~1 (0) & Team~2 (1) \\
+\hline
+\textbf{True} & Team~1 (0) & TN = 208 & FP = 176 \\
+ & Team~2 (1) & FN = 156 & TP = 213 \\
+\end{tabular}
+\end{table}
+
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.6\textwidth]{"Dataset1 report images/Confuxion_Matrix_Logistic_Reversion.png"}
+\caption{Confusion matrix: Logistic Regression baseline.}
+\label{fig:cm_lr}
+\end{figure}
+
+\noindent Figure~\ref{fig:cm_lr} matches Table~\ref{tab:cm_lr}: both error types stay large, so the linear boundary only partly separates the classes.
+
+Everything clears the fifty per cent coin-flip: LR 55.91\%, CatBoost 60.96\%, sparse LR 58.70\%. In a problem this noisy, each point is earned; $\sim$61\% is a solid tabular result and lines up with informal ceilings quoted for pre-match matchups (often lower when neural tricks and extra context are excluded). Confusion tables stay ugly (Table~\ref{tab:cm_lr}, Figures~\ref{fig:cm_lr}, \ref{fig:cm_dt}, \ref{fig:cm_catboost}), which matches live CSGO. The shallow tree lags, as expected.
+
+\paragraph{Naive baselines.}
+Two cheap baselines frame Table~\ref{tab:results}. Majority class is $\sim$50\% by construction. Always picking the higher-ranked side (lower rank number) is not exactly the engineered \texttt{rank\_diff} rule row-for-row, but it lands in the same mid-fifties band as an unregularised logit on everything. Much of what the trained models exploit is therefore ``who is ranked higher''; the remainder is spread across player aggregates and regularisation.
+
+\paragraph{Reading the confusion matrices.}
+For baseline logistic regression (Table~\ref{tab:cm_lr} and Figure~\ref{fig:cm_lr}), false positives and false negatives are both large---the hyperplane is doing its best, but the classes overlap. The decision threshold could be skewed if upsets were costlier than favourites getting through; the tables use 0.5 for comparability.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.6\textwidth]{"Dataset1 report images/Confusion_Matrix_Decision_Tree.png"}
+\caption{Confusion matrix: Decision Tree.}
+\label{fig:cm_dt}
+\end{figure}
+
+\noindent The tree's matrix matches its weaker score: more jagged errors than the linear model because the splits are axis-aligned bites out of the space, not one smooth boundary.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.6\textwidth]{"Dataset1 report images/Confusion Matrix catboost.png"}
+\caption{Confusion matrix: CatBoost (highest test accuracy in Table~\ref{tab:results}).}
+\label{fig:cm_catboost}
+\end{figure}
+
+\noindent CatBoost pulls more mass to the diagonal (Figure~\ref{fig:cm_catboost}) and posts the best accuracy, but plenty of mistakes remain---the features still do not determine the match.
+
+\noindent\textbf{Model comparison.} Figure~\ref{fig:models_accuracy} plots test-set accuracy (and any bundled metrics on the same export) for every trained classifier using the same split and preprocessing as Table~\ref{tab:results}.
+
+\begin{figure}[H]
+\centering
+\makebox[\linewidth][c]{\includegraphics[width=\dimexpr\linewidth+22mm\relax,height=0.82\textheight,keepaspectratio]{"Dataset1 report images/Models accuracy.png"}}
+\caption{Models: test accuracy and related metrics (single export from the comparison run).}
+\label{fig:models_accuracy}
+\end{figure}
+
+\noindent Everyone clears fifty per cent; boosted and ensemble models sit above linear baselines, with improvements of a few points rather than a different problem---consistent with Table~\ref{tab:results} and noisy labels.
+
+
+\begin{figure}[H]
+\centering
+\makebox[\linewidth][c]{\includegraphics[width=\dimexpr\linewidth+22mm\relax,height=0.82\textheight,keepaspectratio]{"Dataset1 report images/Actual Classes(PCA Visualization) K-Means Clusters (PCA Visualization).png"}}
+\caption{PCA: true outcomes vs.\ K-Means clusters ($k=2$); ARI $\approx 0$.}
+\label{fig:pca_kmeans}
+\end{figure}
+
+\noindent Figure~\ref{fig:pca_kmeans} overlays true winners on two unsupervised PCA projections: cluster colour barely aligns with outcome, matching ARI $\approx 0$ and indicating that unlabelled geometry does not recover the \texttt{winner} label.
+
+\paragraph{Interpretation.}
+\textbf{CatBoost} tops the test set at \textbf{60.96\%}; \textbf{logistic regression on fifty forest-selected features} is the strongest linear result at 58.70\%. With balanced teams, \textbf{fifty per cent} is guessing; landing near \textbf{sixty per cent} indicates repeatable structure in ranks and player aggregates rather than luck. Literature on similar tabular pre-match tasks sometimes reports \textbf{up to about sixty-five per cent} when neural pipelines or richer context are allowed; plain tabular runs often stop short. The observed $\sim$61\% fits that picture---limited by missing veto, map pool, and recent form, not by shallow trees. Errors remain large because pistol rounds, vetoes, and day-of noise are absent from the CSV. Other esports pre-match work often lands in the mid-fifties to mid-sixties; these results fall in the same band. Large gains would require richer inputs rather than another round of boosting tweaks. The PCA plot (Figure~\ref{fig:pca_kmeans}) shows K-Means clusters do not align with winners, so unsupervised geometry does not replace labelled training.
+
+\paragraph{Reading the plot with Table~\ref{tab:results}.}
+Figure~\ref{fig:models_accuracy} echoes the table: boosted/tuned models ahead, linear models behind, gains measured in points, not tens of points. Figure~\ref{fig:pca_kmeans} is the reminder that unlabelled clusters are not a substitute for predicting \texttt{winner}.
+
+\subsubsection{1.4.4\quad Model Improvements}
+
+Hyperparameter work uses \GridSearchCVname{} and \RandomizedSearchCVname{} with three-fold CV on the three thousand and ten training rows. Table~\ref{tab:hyperparameter_tuning} lists grids and what won. \textbf{Random Forest} peaks at \textbf{59.54\%} mean CV with \texttt{max\_depth}\,{=}\,10, \texttt{min\_samples\_split}\,{=}\,10, \texttt{n\_estimators}\,{=}\,100, and \textbf{57.64\%} on the held-out test. LR, XGBoost, and LightGBM rows show mean CV from the same pattern. \textbf{CatBoost} stayed on library defaults (no grid here) and still hits \textbf{60.96\%} test, matching Table~\ref{tab:results}.
+
+\begin{table}[H]
+\centering
+\caption{Systematic hyperparameter tuning: parameter grids and best configurations (three-fold CV on the training set).}
+\label{tab:hyperparameter_tuning}
+\small
+\renewcommand{\arraystretch}{1.35}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.2cm}>{\raggedright\arraybackslash}p{5.0cm}>{\raggedright\arraybackslash}p{4.0cm}>{\raggedleft\arraybackslash}p{2.5cm}}
+\toprule
+\textbf{Model} & \textbf{Parameter grid} & \textbf{Best parameters} & \textbf{Mean CV / test} \\
+\midrule
+\mbox{Logistic Regression} & $C \in \{0.01, 0.1, 1, 10\}$; \texttt{class\_weight} & $C = 0.01$ (stronger regularisation) & 58.30\% \\
+\mbox{Random Forest} & \texttt{n\_estimators} $\in \{50, 100\}$, \texttt{max\_depth} $\in \{10, 15, 20\}$, \texttt{min\_samples\_split} $\in \{10, 20\}$ & \texttt{max\_depth}=10, \texttt{min\_samples\_split}=10, \texttt{n\_estimators}=100 & 59.54 / 57.64\% \\
+\mbox{XGBoost} & \texttt{n\_estimators} $\in \{100, 200\}$, \texttt{max\_depth} $\in \{4, 6, 8\}$, \texttt{learning\_rate} $\in \{0.05, 0.1\}$, \texttt{subsample} $\in \{0.8, 0.9\}$ & \texttt{learning\_rate}=0.05, \texttt{max\_depth}=4, \texttt{n\_estimators}=100, \texttt{subsample}=0.8 & 58.07\% \\
+\mbox{LightGBM} & \texttt{n\_estimators} $\in \{200, 300\}$, \texttt{max\_depth} $\in \{5, 7, 9\}$, \texttt{learning\_rate} $\in \{0.03, 0.05, 0.1\}$, \texttt{subsample} $\in \{0.8, 0.9\}$ & \texttt{learning\_rate}=0.03, \texttt{max\_depth}=5, \texttt{n\_estimators}=200, \texttt{subsample}=0.8 & 56.98\% \\
+\mbox{CatBoost} & Basic / default settings & Library defaults (no grid) & 60.96\% \\
+\bottomrule
+\end{tabular}
+
+\vspace{0.55em}
+{\RaggedRight\footnotesize
+\textit{Extended tuning:} \RandomizedSearchCVname{} for XGBoost and LightGBM with expanded grids (\texttt{colsample\_bytree}, \texttt{num\_leaves}, etc.). Threshold sweep on out-of-fold probabilities where implemented.
+
+\textit{Note:} Random Forest grid: twelve candidates (three-fold CV). Logistic regression with \texttt{SelectFromModel} (fifty features) reaches 58.70\% test accuracy (Table~\ref{tab:results}). Single-value entries other than CatBoost are mean CV only; CatBoost reports held-out test accuracy (no grid); Random Forest shows mean CV and test.\par}
+\end{table}
+
+\paragraph{Search design and variance.}
+Three-fold CV trades estimate variance against runtime. Random search explores larger boosting spaces without enumerating every grid cell. Some studies also sweep decision thresholds on out-of-fold probabilities (roughly 0.38--0.63) before fixing 0.5 for reporting. CV scores can look optimistic; the ordering on the \textbf{test} split in Table~\ref{tab:results} is taken as authoritative: CatBoost, then sparse LR, then tuned forest.
+
+\paragraph{Linear versus boosted models.}
+Sparse logistic regression remains useful when interpretable coefficients matter. CatBoost and tuned forests extract a few more points from the same scaled table by stacking weak splits on player and team stats. The margins look small on a 0--100 scale but matter against a fifty per cent baseline; CatBoost still sits a few points under the $\sim$65\% highs quoted on comparable tasks when tactical inputs are missing. Boosting does not remove randomness---it applies the same leakage-safe columns more aggressively.
+
+\subsubsection{1.4.5\quad Feature Importance}
+
+Table~\ref{tab:features} shows the decision tree's top five impurity importances; Table~\ref{tab:rf_importance} does the same for \textbf{Random Forest} (note the smaller scale than a single deep tree). CatBoost's ranking repeats the same story: \texttt{rank\_diff}, world ranks, team KDR, head-to-head. Figures~\ref{fig:top15_features} and~\ref{fig:top20_catboost} show longer lists for the tree and CatBoost.
+
+\begin{table}[H]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{minipage}[t]{0.49\textwidth}
+\centering
+\captionof{table}{Top 5 most important features from Decision Tree.}
+\label{tab:features}
+\begin{tabularx}{\linewidth}{c >{\raggedright\arraybackslash}X r}
+\toprule
+\textbf{Rank} & \textbf{Feature} & \textbf{Importance} \\
+\midrule
+1 & \texttt{rank\_diff} & 0.0836 \\
+2 & \texttt{t1\_avg\_rating} & 0.0280 \\
+3 & \texttt{t1\_player2\_clutch\_win\_perc} & 0.0267 \\
+4 & \texttt{t2\_avg\_rating} & 0.0262 \\
+5 & \texttt{t2\_player5\_clutch\_win\_perc} & 0.0261 \\
+\bottomrule
+\end{tabularx}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\textwidth}
+\centering
+\captionof{table}{Top five features by Random Forest importance.}
+\label{tab:rf_importance}
+\begin{tabularx}{\linewidth}{c >{\raggedright\arraybackslash}X r}
+\toprule
+\textbf{Rank} & \textbf{Feature} & \textbf{Importance} \\
+\midrule
+1 & \texttt{rank\_diff} & 0.0264 \\
+2 & \texttt{t1\_world\_rank} & 0.0147 \\
+3 & \texttt{t2\_h2h\_win\_perc} & 0.0136 \\
+4 & \texttt{t1\_avg\_kdr} & 0.0136 \\
+5 & \texttt{h2h\_advantage} & 0.0130 \\
+\bottomrule
+\end{tabularx}
+\end{minipage}
+\end{table}
+
+\nopagebreak[3]
+
+\begin{figure}[H]
+\centering
+\begin{minipage}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\linewidth,height=0.34\textheight,keepaspectratio]{"Dataset1 report images/Top_15_Feature_Importance.png"}
+\captionof{figure}{Top fifteen features: Decision Tree importance.}
+\label{fig:top15_features}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\linewidth,height=0.34\textheight,keepaspectratio]{"Dataset1 report images/Top 20 Feature Importance - Basic Catboost.png"}
+\captionof{figure}{Top twenty features: CatBoost; aligns with Decision Tree.}
+\label{fig:top20_catboost}
+\end{minipage}
+\end{figure}
+
+\texttt{rank\_diff} and team averages lead the tree plot (Figure~\ref{fig:top15_features}); CatBoost agrees (Figure~\ref{fig:top20_catboost}).
+
+\paragraph{Domain reading of the importance table.}
+\texttt{rank\_diff} on top matches what the histograms already said: rank gap is a blunt but stable handle on who should be favoured. Team averages follow because they compress five players into one number per side. A clutch stat sneaks into the tree top five---clutch rounds matter, but those columns are thin and sample-noisy. Importance is not causality; it reflects which inputs the fitted models relied on in this sample.
+
+\subsubsection{1.4.6\quad Interpretation}
+
+Logistic regression beats the single tree, consistent with many effects being roughly linear after scaling. \textbf{CatBoost} adds a few points by combining weak interactions. Some Kaggle columns (clutch, first-kill rates) look ``post-match flavoured''; they are retained for coursework exploration but would require stricter definitions in production. Matches remain partly random in the manner of live sport rather than deterministic spreadsheet logic. Sixty per cent accuracy is therefore a substantial result against fifty per cent chance, and published ceilings near sixty-five per cent underline how little headroom remains. None of that renders the model suitable for betting; Section~1.5 covers misuse.
+
+\subsubsection{1.4.7\quad Limits of the reported evaluation}
+
+Accuracy and F1 summarise classification quality at a 0.5 threshold; they do not fully describe probability behaviour. Boosting libraries emit calibrated-looking scores in some settings, but tabular match data with overlapping classes can still yield miscalibrated probabilities unless Platt scaling or isotonic regression is fit on held-out data. Stakeholders who care about ranked risk (``top ten matches to watch'') would need calibration checks beyond the confusion matrices shown.
+
+The feature set is also intentionally narrow relative to what a human analyst sees before a match. Map veto order, per-map strength, recent roster moves with only a few games played, and communication-heavy intangibles do not appear in \texttt{csgo\_games.csv}. The models therefore learn from what is available, not from everything that influences a result; the gap between sixty-one per cent and a hypothetical ceiling is partly missing data, not only algorithm choice. Finally, class balance removes the need for class weights in training, which simplifies interpretation but means the pipeline has not been stress-tested on artificially rebalanced samples---an acceptable simplification here, but not if the deployment population shifts toward one-sided matchups.
+
+\subsubsection{1.4.8\quad Plausible extensions (tabular only)}
+
+Within the same tabular setting, several extensions are straightforward to describe even if they were not all implemented end-to-end. Time-based splits and rolling retraining would align evaluation with how odds and rankings actually evolve. Team-ID or roster-ID features could be added with strong regularisation to pool information across seasons without treating every player column as a free parameter. Interaction terms between \texttt{rank\_diff} and head-to-head history could be tested explicitly rather than leaving all interactions to tree ensembles. For transparency, partial dependence or SHAP-style summaries on the CatBoost model would complement impurity and gain-based importances. None of these steps changes the fundamental noise in match outcomes; they mainly tighten estimation and make failure modes easier to audit.
+
+Nested cross-validation would separate hyperparameter selection from final performance estimation more cleanly than a single grid search followed by one test hit. The computational cost rises sharply with boosting grids, which is why the report leans on three-fold CV on the training fold and a single held-out test set for headline reporting. If budgets allow, repeated stratified splits or bootstrap optimism correction would quantify how fragile the two-point gap between CatBoost and logistic regression really is.
+
+% ───────────────────────────────────────────────────────────────────────────
+\subsection{1.5\quad Ethical Considerations}
+
+\subsubsection{1.5.1\quad Potential Biases}
+
+\paragraph{Temporal and concept drift.}
+The rows span several competitive years; patches, maps, and formats shift. A model trained on everything mixes old and new regimes, so the feature-to-label map drifts even when each row looks valid.
+
+\paragraph{Representation and coverage.}
+Top teams show up more often, so errors are optimised under a distribution that favours elite play. Lower tiers, smaller regions, or unusual rosters can be under-sampled; probabilities may be off where the data are thin.
+
+\paragraph{Ranking system and lag.}
+HLTV-style ranks move slowly. Roster upgrades or a new coach can leave the model looking at stale \texttt{rank\_diff} values exactly when humans are uncertain too.
+
+\paragraph{Data collection and aggregation.}
+Public CSVs lean on tier-one LANs and big online leagues; scrims, comms, and morale never appear. Averaging players hides roles (entry vs.\ support) and IGL impact, so identical aggregates can describe different teams in practice.
+
+\subsubsection{1.5.2\quad Mitigation Strategies}
+
+\paragraph{Operational mitigations.}
+Models should be retrained on rolling windows, refreshed after major patches, and augmented with short ``form'' windows when data allow. Evaluation should slice by tier or region so one headline accuracy does not hide poor subgroups. Relative features (\texttt{rank\_diff}, rating gaps) usually outperform raw rank integers alone.
+
+\paragraph{Governance and responsible use.}
+A simple linear model should remain available alongside CatBoost so failures expose interpretable signs. Any deployment beyond coursework should log predictions and outcomes and review poorly performing slices. Player statistics may constitute personal data in some jurisdictions and warrant the same safeguards as other sensitive fields.
+
+\paragraph{Gambling and misuse.}
+The model must \textbf{not} be used for betting. Sixty-one per cent exceeds chance but does not constitute an edge once bookmaker margins and line movement are accounted for. Uncertainty should be communicated when probabilities sit near one half.
+
+\paragraph{Transparency.}
+Provenance of the CSV, columns removed, and engineered features should be documented so readers know what the reported scores condition on.
+
+\subsubsection{1.5.3\quad Key Recommendations}
+
+\begin{enumerate}[leftmargin=1.5em]
+    \item \textbf{CatBoost} (or \textbf{LR with feature selection} when interpretability dominates) should be used only as decision-support, not as an autonomous decision system.
+    \item Models should be \textbf{retrained} on sliding windows of recent matches; post-patch degradation should be monitored.
+    \item Metrics should be \textbf{sliced} by team tier, region, and online versus LAN when sample sizes allow.
+    \item Model outputs should be \textbf{paired} with human review for roster changes and format changes.
+    \item Betting and gambling use cases should be \textbf{prohibited} in product terms; the restriction should be documented for end users.
+\end{enumerate}
+
+\paragraph{Closing remarks (Dataset~1).}
+Section~1 documents cleaning with leakage removed, a compact engineered block, EDA, linear and tree models with K-Means as a check, tuning tables, and CatBoost leading on the test split. The limitations listed above belong in the main narrative: they mark where the pipeline ceases to be reliable. Together, that constitutes the Dataset~1 contribution of this coursework.
+
+What we hand in alongside this PDF is meant to be rerunnable: the raw CSV, the cleaning code or notebook, the fitted scaler, and any saved models, plus the figure files that appear in the report. Someone could in principle reproduce the tables and plots from those files; the write-up explains the choices, but the numbers ultimately come from running that code. Recording library versions (for example scikit-learn and CatBoost) matters because minor updates can change default behaviour and make old results hard to match.
+
+% ═══════════════════════════════════════════════════════════════════════════
+%  REFERENCES (Harvard style, alphabetical order)
+% ═══════════════════════════════════════════════════════════════════════════
+\newpage
+\section{References}
+
+\begin{list}{}{%
+  \setlength{\leftmargin}{2em}%
+  \setlength{\itemindent}{-2em}%
+  \setlength{\itemsep}{0.75em}%
+  \setlength{\parsep}{0pt}}
+
+\item Chen, T. and Guestrin, C. (2016) `XGBoost: A Scalable Tree Boosting System', \textit{Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining}, pp.\ 785--794. Available at: \url{https://doi.org/10.1145/2939672.2939785} (Accessed: 7 February 2025).
+
+\item Harris, C.R., Millman, K.J., van der Walt, S.J. \textit{et al}. (2020) `Array programming with NumPy', \textit{Nature}, 585, pp.\ 357--362. Available at: \url{https://doi.org/10.1038/s41586-020-2649-2} (Accessed: 7 February 2025).
+
+\item HLTV.org (2024) \textit{CSGO Match Statistics}. Available at: \url{https://www.hltv.org} (Accessed: 7 February 2025).
+
+\item Kaggle (2024) \textit{Counter-Strike: Global Offensive matches}. Available at: \url{https://www.kaggle.com/datasets/gabrieltardochi/counter-strike-global-offensive-matches} (Accessed: 7 February 2025).
+
+\item McKinney, W. (2010) `Data structures for statistical computing in Python', in van der Walt, S. and Millman, J. (eds) \textit{Proceedings of the 9th Python in Science Conference}, pp.\ 56--61.
+
+\item Pedregosa, F., Varoquaux, G., Gramfort, A. \textit{et al}. (2011) `Scikit-learn: Machine learning in Python', \textit{Journal of Machine Learning Research}, 12, pp.\ 2825--2830. Available at: \url{https://jmlr.org/papers/v12/pedregosa11a.html} (Accessed: 7 February 2025).
+
+\end{list}
+
+% ═══════════════════════════════════════════════════════════════════════════
+\end{document}
